@@ -2,7 +2,6 @@ import spacy
 import json
 import os
 
-
 verb_list = ["Access", "Ask", "Assign", "Collect", "Create", "Enter", "Gather", "Import", "Obtain", "Observe", "Organize", "Provide", "Receive", "Request", "Share", "Use", "Include", "Integrate", "Monitor", "Process", "See", "Utilize", "Retain", "Cache", "Delete", "Erase", "Keep", "Remove", "Store", "Transfer", "Communicate", "Disclose", "Reveal", "Sell", "Send", "Update", "View", "Need", "Require", "Save"]
 noun_list = ["Address", "Name", "Email", "Phone", "Birthday", "Age", "Gender", "Location", "Datum", "Contact", "Phonebook", "SMS", "Call", "Profession", "Income", "Information"]
 
@@ -13,16 +12,27 @@ verb_list = list(map(lambda item: str(item).lower(), verb_list))
 def extract_phrases(text):
     nlp = spacy.load("en_core_web_sm")
     doc = nlp(text)
-    phrases = list()
+    long_phrases = list()
+    nsubj_phrases = list()
+    dobj_phrases = list()
     for sent in doc.sents:
+        type_1 = list()
+        type_2 = list()
         for chunk in sent.noun_chunks:
             if chunk.root.dep_ == "nsubj":
-                if chunk.root.lemma_.lower() in noun_list and chunk.root.head.lemma_.lower() in verb_list:
-                    phrases.append(chunk.root.lemma_ + " " + chunk.root.head.lemma_)
+                type_1.append(chunk)
             if chunk.root.dep_ == "dobj":
-                if chunk.root.lemma_.lower() in noun_list and chunk.root.head.lemma_.lower() in verb_list:
-                    phrases.append(chunk.root.head.lemma_ + " " + chunk.root.lemma_)
-    return list(set(phrases))
+                type_2.append(chunk)
+        nsubj_phrases.extend(type_1)
+        dobj_phrases.extend(type_2)
+        for chunk_1 in type_1:
+            for chunk_2 in type_2:
+                if chunk_1.root.head.idx == chunk_2.root.head.idx:
+                    phrase = chunk_1.text + " " + chunk_1.root.head.lemma_ + " " + chunk_2.root.text
+                    for conj in chunk_2.conjuncts:
+                        phrase += " " + conj.text
+                    long_phrases.append(phrase)
+    return list(set(long_phrases)), list(set(nsubj_phrases)), list(set(dobj_phrases))
 
 
 skill_intro_directory = "./data/skills_intro_pages/"
@@ -35,7 +45,7 @@ for k, v in policy_list.items():
             skill_intro_page = json.loads(open(skill_intro_directory+skill_intro+".json", "r").read())
             description = skill_intro_page['description']
             policy = open(privacy_policy_directory+v[0]+".txt", "r").read()
-            print(extract_phrases(description))
-            print(extract_phrases(policy))
+            print(extract_phrases(description)[0])
+            print(extract_phrases(policy)[0])
             break
         break
